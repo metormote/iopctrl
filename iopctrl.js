@@ -6,10 +6,18 @@ iopctrl = function() {
     function iopctrl_local_coordinate(element, x, y) {
         var svgRoot = element.ownerSVGElement;
         var p =  svgRoot.createSVGPoint();
-        p.x = x;
-        p.y = y;
+        //adjust for scroll offset on mobile devices
+        if (navigator.userAgent.match(/(iPod|iPhone|iPad|Android)/)) {
+            p.x = x + (window.pageXOffset ? window.pageXOffset : 0);
+            p.y = y + (window.pageYOffset ? window.pageYOffset : 0);
+        }
+        else {
+            p.x = x;
+            p.y = y;
+        }
         //handle polymer issue
         var ctm = element.impl ? element.impl.getScreenCTM() : element.getScreenCTM();
+        //alert(JSON.stringify(ctm, null, 4));
         return p.matrixTransform(ctm.inverse());
     }
     
@@ -545,6 +553,7 @@ iopctrl = function() {
             .on("pointerdown", function() {
                 var x = d3.event.clientX, y = d3.event.clientY;
                 var coord = iopctrl_local_coordinate(this, x, y);
+                //alert("x="+x + ": y=" + y + " cx=" + coord.x + " cy=" + coord.y);
                 var rc = pointToRad(coord.x, coord.y, false);
                 var omega = rc.omega;
                 var iz = _invert ?  (omega < _range[0] + _comp / 8) && (omega > _range[1] - _comp / 8) : (omega > _range[0] - _comp / 8) && (omega < _range[1] + _comp / 8);
@@ -594,10 +603,10 @@ iopctrl = function() {
         function redraw(value, td)
         {
             if(value == _currentValue) return;
-            
             _delta = 0;
+
             var rad = iopctrl_convert(axis.scale(), value);
-            var startRad = undefined != _currentRad ? _currentRad : _range[0];
+            var startRad = (typeof _currentRad == "undefined" || isNaN(_currentRad)) ?  _range[0] : _currentRad;
             
             _cursorUpdate.transition()
                 .duration(td)
@@ -1076,6 +1085,7 @@ iopctrl = function() {
     }
     function iopctrl_convert(scale, x) {
         var d = scale(x);
+        isNaN(d) ? d = iopctrl_scaleRange(scale)[0] : d;
         return scale.rangeBand ? d + scale.rangeBand() / 2 : d;
     }
     function iopctrl_invert(scale, x) {
