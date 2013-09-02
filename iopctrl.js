@@ -1,39 +1,18 @@
 iopctrl = function() {
     var iopctrl = {
-        version: "0.0.1"
+        version: "0.0.2"
     };
-    /*function iopctrl_offset(e) {
-        var x = y = 0;
-        if (e.offsetParent) {
-            do {
-                x += e.offsetLeft;
-                y += e.offsetTop;
-            } while (e = e.offsetParent);
-            return {"offsetX": x, "offsetY": y};
-        }
-    };*/
-    function iopctrl_offset(e) {
-        var box = e.getBoundingClientRect(), doc = e.ownerDocument, body = doc.body, docElem = doc.documentElement,
-            clientTop = docElem.clientTop || body.clientTop || 0, clientLeft = docElem.clientLeft || body.clientLeft || 0,
-            top  = box.top  + (docElem.scrollTop  || body.scrollTop || window.pageYOffset) - clientTop,
-            left = box.left + (docElem.scrollLeft || body.scrollLeft || window.pageXOffset) - clientLeft;
-        return { offsetX: left, offsetY: top };
+    
+    function iopctrl_local_coordinate(element, x, y) {
+        var svgRoot = element.ownerSVGElement;
+        var p =  svgRoot.createSVGPoint();
+        p.x = x;
+        p.y = y;
+        //handle polymer issue
+        var ctm = element.impl ? element.impl.getScreenCTM() : element.getScreenCTM();
+        return p.matrixTransform(ctm.inverse());
     }
     
-     function iopctrl_coordinates(e) {
-         var posx = 0;
-         var posy = 0;
-         if (e.clientX || e.clientY) 	{
-             posx = e.clientX + (document.body.scrollLeft
-             || document.documentElement.scrollLeft
-             || window.pageXOffset);
-             posy = e.clientY + (document.body.scrollTop
-             || document.documentElement.scrollTop
-             || window.pageYOffset);
-         }
-         return {"pageX": posx, "pageY": posy};
-     }
-     
     iopctrl.LedButton = function() {
     
     };
@@ -300,8 +279,9 @@ iopctrl = function() {
                     d3.event.preventDefault();
                     return false;})
                 .on("pointerdown", function() {
-                    var coord = iopctrl_coordinates(d3.event);
-                    var pos = pointToPos(this, coord.pageX, coord.pageY, false);
+                    var x = d3.event.clientX, y = d3.event.clientY;
+                    var coord = iopctrl_local_coordinate(this, x, y);
+                    var pos = pointToPos(coord.x, coord.y);
                     var p = (_vertical ? pos.y : pos.x);
                     if(moveToTouch) {
                         redraw(pointToValue(p), transitionDuration);
@@ -315,8 +295,9 @@ iopctrl = function() {
                     return false;})
                 .on("pointermove", function() {
                     if(!_slide) return false;
-                    var coord = iopctrl_coordinates(d3.event);
-                    var pos = pointToPos(this, coord.pageX, coord.pageY, true);
+                    var x = d3.event.clientX, y = d3.event.clientY;
+                    var coord = iopctrl_local_coordinate(this, x, y);
+                    var pos = pointToPos(coord.x, coord.y);
                     var min, max, p;
                     if(moveToTouch) {
                         p = (_vertical ? pos.y : pos.x);
@@ -429,11 +410,8 @@ iopctrl = function() {
             _onValueChanged = x;
             return slider;
         };
-        function pointToPos(e, x, y)
+        function pointToPos(x, y)
         {
-            var offset = iopctrl_offset(e);
-            x -=  (offset.offsetX + margin.left);
-            y -=  (offset.offsetY + margin.top);
             _deltaX += x - (_lastPos.x || x);
             _deltaY += y - (_lastPos.y || y);
             _lastPos = {"x": x, "y": y, "deltaX": _deltaX, "deltaY": _deltaY};
@@ -501,7 +479,7 @@ iopctrl = function() {
 
                 _cursorArc = d3.svg.arc()
                     .startAngle(_range[0])
-                    .endAngle(_range[0])
+                    .endAngle(_range[1])
                     .innerRadius(arcFactor * radius)
                     .outerRadius(radius);
 
@@ -565,8 +543,9 @@ iopctrl = function() {
                 return false;
             })
             .on("pointerdown", function() {
-                var coord = iopctrl_coordinates(d3.event);
-                var rc = pointToRad(this, coord.pageX, coord.pageY, false);
+                var x = d3.event.clientX, y = d3.event.clientY;
+                var coord = iopctrl_local_coordinate(this, x, y);
+                var rc = pointToRad(coord.x, coord.y, false);
                 var omega = rc.omega;
                 var iz = _invert ?  (omega < _range[0] + _comp / 8) && (omega > _range[1] - _comp / 8) : (omega > _range[0] - _comp / 8) && (omega < _range[1] + _comp / 8);
                 if(rc.r > arcFactor*radius && iz) {
@@ -581,8 +560,9 @@ iopctrl = function() {
                 return false;})
             .on("pointermove", function() {
                 if(!_slide) return false;
-                var coord = iopctrl_coordinates(d3.event);
-                var rc = pointToRad(this, coord.pageX, coord.pageY, true);
+                var x = d3.event.clientX, y = d3.event.clientY;
+                var coord = iopctrl_local_coordinate(this, x, y);
+                var rc = pointToRad(coord.x, coord.y, true);
                 var omega;
                 if(moveToTouch) {
                     omega = rc.omega;
@@ -714,10 +694,7 @@ iopctrl = function() {
             _onValueChanged = x;
             return arcslider;
         };
-        function pointToRad(e, x, y, cont) {
-            var offset = iopctrl_offset(e.parentElement.parentElement);
-            x -=  (offset.offsetX + radius + margin.left);
-            y -=  (offset.offsetY + radius + margin.top);
+        function pointToRad(x, y, cont) {
             var r = Math.sqrt(x * x + y * y);
             var omega = Math.atan2(x, -y);
             
